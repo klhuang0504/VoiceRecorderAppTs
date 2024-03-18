@@ -4522,6 +4522,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"expo-speech@npm:~11.7.0":
+  version: 11.7.0
+  resolution: "expo-speech@npm:11.7.0"
+  peerDependencies:
+    expo: "*"
+  checksum: 27463e8add883b87de81936ae129e6d0d063c5dee6cf47636a95c6f54b694baa83d5db3053ef80d541c13fa7ee731e5d2e678537432193413c7b030c595599db
+  languageName: node
+  linkType: hard
+
 "expo-status-bar@npm:~1.11.1":
   version: 1.11.1
   resolution: "expo-status-bar@npm:1.11.1"
@@ -8901,6 +8910,7 @@ __metadata:
     expo: ~50.0.13
     expo-av: ~10.2.0
     expo-permissions: ~13.1.0
+    expo-speech: ~11.7.0
     expo-status-bar: ~1.11.1
     react: 18.2.0
     react-dom: 17.0.1

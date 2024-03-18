@@ -1,81 +1,112 @@
-import React, { useState, useEffect } from 'react';
-import { Text, View, TouchableOpacity } from 'react-native';
+import React, { useState, FC } from 'react';
+import { Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Audio } from 'expo-av';
-import * as Permissions from 'expo-permissions';
-import * as FileSystem from 'expo-file-system';
+import { speak } from 'expo-speech'; // Import the speak function from expo-speech
 
-const Recorder: React.FC = () => {
+interface RecorderProps {}
+
+interface RecordingState {
+  recording: Audio.Recording | null;
+  loading: boolean;
+}
+
+const Recorder: FC<RecorderProps> = () => {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [fileUri, setFileUri] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  useEffect(() => {
-    getPermissions();
-  }, []);
-
-  const getPermissions = async () => {
-    const { status } = await Permissions.askAsync(Permissions.AUDIO_RECORDING);
-    if (status !== 'granted') {
-      alert('Permission to record audio is required!');
-    }
-  };
-
-  const startRecording = async () => {
+  const startRecording = async (): Promise<void> => {
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
         alert('Permission to record audio is required!');
         return;
       }
-
+      showTranscription('');
       const newRecording = new Audio.Recording();
       await newRecording.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
       await newRecording.startAsync();
       setRecording(newRecording);
+
     } catch (error) {
       console.error('Failed to start recording', error);
     }
   };
 
-  const stopRecording = async () => {
+  const stopRecording = async (): Promise<void> => {
     try {
       if (recording) {
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
         console.log('Recording stopped, URI:', uri);
-        setRecording(null);
-        setFileUri(uri); // Set the URI to upload after recording
+        if (uri) {
+          setRecording(null);
+          uploadAudio(uri); // Upload the audio file to the server
+        }
       }
     } catch (error) {
       console.error('Failed to stop recording', error);
     }
   };
 
-  const downloadFile = async () => {
-    if (fileUri) {
-      const fileName = 'recorded_audio.mp3'; // Change the file name if needed
-    //   await FileSystem.downloadAsync(fileUri, FileSystem.documentDirectory + fileName);
-      const response = await fetch(fileUri);
+  const uploadAudio = async (uri: string): Promise<void> => {
+    setLoading(true); // Set loading state to true while waiting for response
+
+    try {
+      const response = await fetch(uri);
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+      let formData = new FormData();
+      formData.append('audio', blob, 'recorded_audio.mp3');
+
+      const uploadResponse = await fetch('http://localhost:3000/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('Upload response:', uploadResponse);
+      const data = await uploadResponse.json();
+      console.log('Server response:', data);
+
+      speak(data.transcription); // Replace with your transcribed text
+
+      showTranscription(data.transcription);
+
+    } catch (error) {
+      console.error('Failed to upload audio', error);
+    }
+    setLoading(false); // Set loading state back to false after response
+  };
+
+  const showTranscription = (transcription: string): void => {
+    const transcriptionElement = document.getElementById('transcription');
+    if (transcriptionElement) {
+      transcriptionElement.innerText = transcription;
+      transcriptionElement.style.color = 'green'; // Set the text color to green
+      transcriptionElement.style.fontWeight = 'bold'; // Set the text to bold
+      transcriptionElement.style.cursor = 'pointer'; // Set the text to bold
+
+    } else {
+      console.error('Transcription element not found');
+    }
+  };
+
+  const speakTranscription = (): void => {
+    const transcription = document.getElementById('transcription')?.innerText;
+    if (transcription) {
+      speak(transcription);
     }
   };
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <TouchableOpacity onPress={recording ? stopRecording : startRecording}>
-        <Text style={{ fontSize: 20 }}>{recording ? 'Stop Recording' : 'Start Recording'}</Text>
-      </TouchableOpacity>
-      {fileUri && (
-        <TouchableOpacity onPress={downloadFile} style={{ marginTop: 20 }}>
-          <Text style={{ fontSize: 20, color: 'blue' }}>Download Record</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#0000ff" /> // Show loading spinner while waiting
+      ) : (
+        <TouchableOpacity onPress={recording ? stopRecording : startRecording}>
+          <Text style={{ fontSize: 20 }}>{recording ? 'Stop Recording' : 'Start Recording'}</Text>
         </TouchableOpacity>
       )}
+      <a id="transcription" onClick={speakTranscription}></a>
     </View>
   );
 };
